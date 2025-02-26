@@ -1,20 +1,18 @@
+from utils_real_drop.modify_llama import H2OLlamaAttention_streaming, H2OLlamaForCausalLM_streaming
+from transformers.models.llama.modeling_llama import LlamaAttention
+from streaming_llm.utils import load, download_url, load_jsonl
+from tqdm import tqdm
+import sys
+import re
+import time
+import os
+import json
+import argparse
+import torch
 import warnings
 
 warnings.filterwarnings("ignore")
 
-import torch
-import argparse
-import json
-import os
-import time
-import re
-import sys
-
-from tqdm import tqdm
-from streaming_llm.utils import load, download_url, load_jsonl
-
-from transformers.models.llama.modeling_llama import LlamaAttention
-from utils_real_drop.modify_llama import H2OLlamaAttention_streaming, H2OLlamaForCausalLM_streaming
 
 @torch.no_grad()
 def greedy_generate(model, tokenizer, input_ids, past_key_values, max_gen_len):
@@ -57,6 +55,7 @@ def greedy_generate(model, tokenizer, input_ids, past_key_values, max_gen_len):
     print(" ".join(generated_text[pos:]), flush=True)
     return past_key_values
 
+
 @torch.no_grad()
 def streaming_inference(model, tokenizer, prompts, kv_cache=None, max_gen_len=1000):
     past_key_values = None
@@ -74,6 +73,7 @@ def streaming_inference(model, tokenizer, prompts, kv_cache=None, max_gen_len=10
             model, tokenizer, input_ids, past_key_values, max_gen_len=max_gen_len
         )
 
+
 @torch.no_grad()
 def streaming_inference_heavy_hitter(model, tokenizer, prompts, kv_cache=None, max_gen_len=1000):
     past_key_values = None
@@ -89,7 +89,7 @@ def streaming_inference_heavy_hitter(model, tokenizer, prompts, kv_cache=None, m
             for name, m in model.named_modules():
                 if isinstance(m, H2OLlamaAttention):
                     layer_idx = int(name.split(".")[2])
-                    past_key_values[layer_idx] = m.kv_cache.evict_for_space(past_key_values[layer_idx], space_needed)   
+                    past_key_values[layer_idx] = m.kv_cache.evict_for_space(past_key_values[layer_idx], space_needed)
 
         past_key_values = greedy_generate(
             model, tokenizer, input_ids, past_key_values, max_gen_len=max_gen_len

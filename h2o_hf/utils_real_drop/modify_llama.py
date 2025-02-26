@@ -20,12 +20,13 @@ from transformers.models.llama.modeling_llama import (
 import types
 
 __all__ = ["H2OLlamaForCausalLM", "H2OLlamaAttention",
-            'H2OLlamaAttention_streaming', 'H2OLlamaForCausalLM_streaming']
+           'H2OLlamaAttention_streaming', 'H2OLlamaForCausalLM_streaming']
 
 
 from transformers.configuration_utils import PretrainedConfig
 
 LLAMA_PRETRAINED_CONFIG_ARCHIVE_MAP = {}
+
 
 class LlamaConfig(PretrainedConfig):
     r"""
@@ -190,19 +191,6 @@ class LlamaConfig(PretrainedConfig):
             raise ValueError(f"`rope_scaling`'s factor field must be a float > 1, got {rope_scaling_factor}")
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 def repeat_kv(hidden_states: torch.Tensor, n_rep: int) -> torch.Tensor:
     """
     This is the equivalent of torch.repeat_interleave(x, dim=1, repeats=n_rep). The hidden states go from (batch,
@@ -214,8 +202,9 @@ def repeat_kv(hidden_states: torch.Tensor, n_rep: int) -> torch.Tensor:
     hidden_states = hidden_states[:, :, None, :, :].expand(batch, num_key_value_heads, n_rep, slen, head_dim)
     return hidden_states.reshape(batch, num_key_value_heads * n_rep, slen, head_dim)
 
+
 def _make_causal_mask(
-    bsz: int, tgt_len: int, past_key_values_length: int, dtype: torch.dtype, device: torch.device):
+        bsz: int, tgt_len: int, past_key_values_length: int, dtype: torch.dtype, device: torch.device):
     """
     Make causal mask used for bi-directional self-attention.
     """
@@ -282,7 +271,7 @@ class H2OKVCache_LayerWise:
         k_hh_recent = past_key_values[0].squeeze()[mask].view(bsz, num_heads, -1, head_dim)
         v_hh_recent = past_key_values[1].squeeze()[mask].view(bsz, num_heads, -1, head_dim)
 
-        self.hh_score= self.hh_score[mask].view(num_heads, self.cache_size)
+        self.hh_score = self.hh_score[mask].view(num_heads, self.cache_size)
 
         return (k_hh_recent, v_hh_recent)
 
@@ -310,7 +299,7 @@ class H2OKVCache_LayerWise:
         k_hh_recent = past_key_values[0].squeeze()[mask].view(bsz, num_heads, -1, head_dim)
         v_hh_recent = past_key_values[1].squeeze()[mask].view(bsz, num_heads, -1, head_dim)
 
-        self.hh_score= self.hh_score[mask].view(num_heads, self.cache_size)
+        self.hh_score = self.hh_score[mask].view(num_heads, self.cache_size)
 
         return (k_hh_recent, v_hh_recent)
 
@@ -464,11 +453,11 @@ class H2OLlamaAttention(nn.Module):
 
         position_length = kv_seq_len
         if not position_ids.nelement() > 1:
-            if position_length < position_ids.item()+1:
-                position_length = position_ids.item()+1
+            if position_length < position_ids.item() + 1:
+                position_length = position_ids.item() + 1
 
         cos, sin = self.rotary_emb(value_states, seq_len=position_length)
-        ### Shift Pos: query pos is min(cache_size, idx)
+        # Shift Pos: query pos is min(cache_size, idx)
         # query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
         query_states = apply_rotary_pos_emb_single(query_states, cos, sin, position_ids)
         key_states = apply_rotary_pos_emb_single(key_states, cos, sin, position_ids)
@@ -549,8 +538,7 @@ class H2OLlamaForCausalLM(LlamaForCausalLM):
             self.model.layers[layer_idx].self_attn = H2OLlamaAttention(config)
 
 
-
-## H2O KV Cache dropping with Position rolling
+# H2O KV Cache dropping with Position rolling
 class H2OLlamaAttention_streaming(nn.Module):
     """Multi-headed attention from 'Attention Is All You Need' paper"""
 
@@ -688,7 +676,7 @@ class H2OLlamaAttention_streaming(nn.Module):
             position_ids[0][0] = kv_seq_len - 1
 
         cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
-        ### Shift Pos: query pos is min(cache_size, idx)
+        # Shift Pos: query pos is min(cache_size, idx)
         # query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
         query_states = apply_rotary_pos_emb_single(query_states, cos, sin, position_ids)
         ###
@@ -700,7 +688,7 @@ class H2OLlamaAttention_streaming(nn.Module):
 
         past_key_value = (key_states, value_states) if use_cache else None
 
-        ### Shift Pos: key pos is the pos in cache (Rolling KV Cache and using relative pos emb)
+        # Shift Pos: key pos is the pos in cache (Rolling KV Cache and using relative pos emb)
         key_position_ids = torch.arange(kv_seq_len, device=position_ids.device).unsqueeze(0)
         key_states = apply_rotary_pos_emb_single(key_states, cos, sin, key_position_ids)
         ###
@@ -772,8 +760,3 @@ class H2OLlamaForCausalLM_streaming(LlamaForCausalLM):
         num_layers = len(self.model.layers)
         for layer_idx in range(num_layers):
             self.model.layers[layer_idx].self_attn = H2OLlamaAttention_streaming(config)
-
-
-
-
-
